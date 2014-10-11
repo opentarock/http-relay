@@ -35,10 +35,10 @@ func RelayHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Error("Only POST method allowed", "method", r.Method)
 		return
 	}
-	contentType := r.Header.Get("Context-Type")
-	if isJsonRequest(contentType) {
+	contentType := r.Header.Get("Content-Type")
+	if !isJsonRequest(contentType) {
 		w.WriteHeader(http.StatusBadRequest)
-		logger.Error("Context type must be application/json", "mime", contentType)
+		logger.Error("Content type must be application/json", "mime", contentType)
 		return
 	}
 
