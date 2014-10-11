@@ -8,6 +8,7 @@ import (
 
 	"github.com/opentarock/http-relay/relay"
 	"github.com/opentarock/http-relay/vars"
+	"github.com/opentarock/service-api/go/client"
 	"github.com/opentarock/service-api/go/log"
 )
 
@@ -30,9 +31,17 @@ func main() {
 
 	logger.Info("Starting http relay ...")
 
-	http.HandleFunc("/relay", relay.RelayHandler)
+	msgHandlerClient := client.NewMsgHandlerClientNanomsg()
+	err := msgHandlerClient.Connect("tcp://localhost:11101")
+	if err != nil {
+		logger.Error("Error starting http relay", "error", err)
+		os.Exit(1)
+	}
+	defer msgHandlerClient.Close()
 
-	err := http.ListenAndServe(":8081", nil)
+	http.Handle("/relay", relay.NewRelayHandler(msgHandlerClient))
+
+	err = http.ListenAndServe(":8081", nil)
 	if err != nil {
 		logger.Error("Error starting http server", "error", err)
 		os.Exit(1)

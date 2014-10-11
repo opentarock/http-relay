@@ -1,11 +1,13 @@
 package relay
 
 import (
+	"io/ioutil"
 	"mime"
 	"net/http"
 	"time"
 
 	"github.com/opentarock/http-relay/vars"
+	"github.com/opentarock/service-api/go/client"
 	"github.com/opentarock/service-api/go/proto_headers"
 	"github.com/opentarock/service-api/go/reqcontext"
 
@@ -24,25 +26,42 @@ func isJsonRequest(v string) bool {
 	return err == nil && mt == "application/json"
 }
 
-func RelayHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := newContext(context.Background())
-	defer cancel()
+func NewRelayHandler(mhClient client.MsgHandlerClient) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := newContext(context.Background())
+		defer cancel()
 
-	logger := reqcontext.ContextLogger(ctx, "name", vars.ModuleName, "ip", r.RemoteAddr)
+		logger := reqcontext.ContextLogger(ctx, "name", vars.ModuleName, "ip", r.RemoteAddr)
 
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		logger.Error("Only POST method allowed", "method", r.Method)
-		return
-	}
-	contentType := r.Header.Get("Content-Type")
-	if !isJsonRequest(contentType) {
-		w.WriteHeader(http.StatusBadRequest)
-		logger.Error("Content type must be application/json", "mime", contentType)
-		return
-	}
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			logger.Error("Only POST method allowed", "method", r.Method)
+			return
+		}
+		contentType := r.Header.Get("Content-Type")
+		if !isJsonRequest(contentType) {
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("Content type must be application/json", "mime", contentType)
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	logger.Info("Sending message to router")
-	w.Write([]byte("{}"))
+		logger.Info("Sending message to router")
+
+		data, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Error("Error reading request body", "error", err)
+			return
+		}
+
+		result, err := mhClient.RouteMessage(ctx, string(data))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Error("Error routing the message", "error", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write([]byte(result.GetData()))
+	})
 }
