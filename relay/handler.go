@@ -14,10 +14,11 @@ import (
 	"code.google.com/p/go.net/context"
 )
 
-const defaultRequestTimeout = 2 * time.Second
+const defaultRequestTimeout = 10 * time.Second
 
 func newContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx = reqcontext.WithCorrId(ctx, *proto_headers.NewRequestCorrelationHeader())
+	ctx = reqcontext.WithAuth(ctx, "1", "token")
 	return context.WithTimeout(ctx, defaultRequestTimeout)
 }
 
